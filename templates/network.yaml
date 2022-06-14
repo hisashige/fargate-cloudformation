@@ -1,0 +1,136 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Network Layer"
+Parameters:
+  ProjectId:
+    Description: "Project name id"
+    Type: String
+    AllowedPattern: '^[a-zA-Z0-9-/:-@\[-\`\{-\~]+$'
+    ConstraintDescription: "InvalidValue[ProjectId]"
+    Default: sample
+  EnvironmentType:
+    Description: "The environment type"
+    Type: String
+    Default: dev
+    AllowedValues:
+      - prd
+      - stage
+      - dev
+    ConstraintDescription: must be a prd or stage or dev
+Mappings:
+  prd:
+    VPC:
+      VpcCidrBlock: 10.0.0.0/16
+    Subnet:
+      PublicSubnet1: 10.0.0.0/24
+      PublicSubnet2: 10.0.1.0/24
+  stage:
+    VPC:
+      VpcCidrBlock: 10.1.0.0/16
+    Subnet:
+      PublicSubnet1: 10.1.0.0/24
+      PublicSubnet2: 10.1.1.0/24
+  dev:
+    VPC:
+      VpcCidrBlock: 10.2.0.0/16
+    Subnet:
+      PublicSubnet1: 10.2.0.0/24
+      PublicSubnet2: 10.2.1.0/24
+Resources:
+  # ------------------------------------------------------------#
+  #  VPC
+  # ------------------------------------------------------------#
+  VPC:
+    Type: "AWS::EC2::VPC"
+    Properties:
+      CidrBlock: !FindInMap [!Ref EnvironmentType, VPC, VpcCidrBlock]
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      InstanceTenancy: "default"
+      Tags:
+        - Key: "Name"
+          Value: !Sub "${ProjectId}-${EnvironmentType}-vpc"
+
+  # ------------------------------------------------------------#
+  #  Subnet
+  # ------------------------------------------------------------#
+  Subnet1:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      AvailabilityZone: !Sub "${AWS::Region}a"
+      CidrBlock: !FindInMap [!Ref EnvironmentType, Subnet, PublicSubnet1]
+      VpcId: !Ref VPC
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: "Name"
+          Value: !Sub "${ProjectId}-${EnvironmentType}-subnet1"
+
+  Subnet2:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      AvailabilityZone: !Sub "${AWS::Region}c"
+      CidrBlock: !FindInMap [!Ref EnvironmentType, Subnet, PublicSubnet2]
+      VpcId: !Ref VPC
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: "Name"
+          Value: !Sub "${ProjectId}-${EnvironmentType}-subnet2"
+
+  # ------------------------------------------------------------#
+  #  InternetGateway
+  # ------------------------------------------------------------#
+  InternetGateway:
+    Type: "AWS::EC2::InternetGateway"
+    Properties:
+      Tags:
+        - Key: "Name"
+          Value: !Sub "${ProjectId}-${EnvironmentType}-igw"
+
+  VPCGatewayAttachment:
+    Type: "AWS::EC2::VPCGatewayAttachment"
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  # ------------------------------------------------------------#
+  #  Route
+  # ------------------------------------------------------------#
+  RouteTable:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: "Name"
+          Value: !Sub "${ProjectId}-${EnvironmentType}-rt"
+
+  Route:
+    Type: "AWS::EC2::Route"
+    Properties:
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref RouteTable
+
+  SubnetRouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref Subnet1
+
+  SubnetRouteTableAssociation2:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref Subnet2
+
+Outputs:
+  VPC:
+    Value: !Ref VPC
+    Export:
+      Name: !Sub "${ProjectId}-${EnvironmentType}-vpc"
+  Subnet1:
+    Value: !Ref Subnet1
+    Export:
+      Name: !Sub "${ProjectId}-${EnvironmentType}-subnet1"
+  Subnet2:
+    Value: !Ref Subnet2
+    Export:
+      Name: !Sub "${ProjectId}-${EnvironmentType}-subnet2"

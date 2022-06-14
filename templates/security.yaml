@@ -1,0 +1,108 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Security Layer"
+Parameters:
+  ProjectId:
+    Description: "Project name id"
+    Type: String
+    AllowedPattern: '^[a-zA-Z0-9-/:-@\[-\`\{-\~]+$'
+    ConstraintDescription: "InvalidValue[ProjectId]"
+    Default: sample
+  EnvironmentType:
+    Description: "The environment type"
+    Type: String
+    Default: dev
+    AllowedValues:
+      - prd
+      - stage
+      - dev
+    ConstraintDescription: must be a prd or stage or dev
+Resources:
+  # ------------------------------------------------------------#
+  #  SecurityGroup
+  # ------------------------------------------------------------#
+  SecurityGroupALB:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "security group for alb"
+      GroupName: !Sub "${ProjectId}-${EnvironmentType}-alb-secgrp"
+      VpcId: { "Fn::ImportValue": !Sub "${ProjectId}-${EnvironmentType}-vpc" }
+      SecurityGroupIngress:
+        - CidrIp: "0.0.0.0/0"
+          FromPort: 80
+          IpProtocol: "tcp"
+          ToPort: 80
+      SecurityGroupEgress:
+        - CidrIp: "0.0.0.0/0"
+          IpProtocol: "-1"
+
+  SecurityGroupWEBService:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "for web ECS service"
+      GroupName: !Sub "${ProjectId}-${EnvironmentType}-web-service-secgrp"
+      VpcId: { "Fn::ImportValue": !Sub "${ProjectId}-${EnvironmentType}-vpc" }
+      SecurityGroupIngress:
+        - SourceSecurityGroupId: !Ref SecurityGroupALB
+          SourceSecurityGroupOwnerId: "123456789012"
+          FromPort: 3000
+          IpProtocol: "tcp"
+          ToPort: 3000
+      SecurityGroupEgress:
+        - CidrIp: "0.0.0.0/0"
+          IpProtocol: "-1"
+
+  SecurityGroupAPIService:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "for api ECS service"
+      GroupName: !Sub "${ProjectId}-${EnvironmentType}-api-service-secgrp"
+      VpcId: { "Fn::ImportValue": !Sub "${ProjectId}-${EnvironmentType}-vpc" }
+      SecurityGroupIngress:
+        - SourceSecurityGroupId: !Ref SecurityGroupALB
+          SourceSecurityGroupOwnerId: "123456789012"
+          FromPort: 5000
+          IpProtocol: "tcp"
+          ToPort: 5000
+      SecurityGroupEgress:
+        - CidrIp: "0.0.0.0/0"
+          IpProtocol: "-1"
+
+  SecurityGroupRDS:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "for RDS"
+      GroupName: !Sub "${ProjectId}-${EnvironmentType}-rds-secgrp"
+      VpcId: { "Fn::ImportValue": !Sub "${ProjectId}-${EnvironmentType}-vpc" }
+      SecurityGroupIngress:
+        - SourceSecurityGroupId: !Ref SecurityGroupAPIService
+          SourceSecurityGroupOwnerId: "123456789012"
+          Description: "permission for ECS APIservice"
+          FromPort: 3306
+          IpProtocol: "tcp"
+          ToPort: 3306
+        - CidrIp: "113.37.16.194/32"
+          Description: "permission for KDL global IP"
+          FromPort: 3306
+          IpProtocol: "tcp"
+          ToPort: 3306
+      SecurityGroupEgress:
+        - CidrIp: "0.0.0.0/0"
+          IpProtocol: "-1"
+
+Outputs:
+  SecurityGroupALB:
+    Value: !Ref SecurityGroupALB
+    Export:
+      Name: !Sub "${ProjectId}-${EnvironmentType}-secgrp-alb"
+  SecurityGroupWEBService:
+    Value: !Ref SecurityGroupWEBService
+    Export:
+      Name: !Sub "${ProjectId}-${EnvironmentType}-secgrp-web-service"
+  SecurityGroupAPIService:
+    Value: !Ref SecurityGroupAPIService
+    Export:
+      Name: !Sub "${ProjectId}-${EnvironmentType}-secgrp-api-service"
+  SecurityGroupRDS:
+    Value: !Ref SecurityGroupRDS
+    Export:
+      Name: !Sub "${ProjectId}-${EnvironmentType}-secgrp-rds"

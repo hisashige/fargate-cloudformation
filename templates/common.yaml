@@ -1,0 +1,147 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Common Layer for all environment"
+Resources:
+  # ------------------------------------------------------------#
+  #  Role
+  # ------------------------------------------------------------#
+
+  ECSTaskRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      Path: "/"
+      RoleName: "ECSTaskRole"
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      MaxSessionDuration: 3600
+
+  ECSTaskExecRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      Path: "/"
+      RoleName: "EcsTaskExecRole"
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      MaxSessionDuration: 3600
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+
+  # ------------------------------------------------------------#
+  #  Policy
+  # ------------------------------------------------------------#
+
+  ECSTaskRolePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: ECSTaskRolePolicy
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: Hoge
+            Effect: Allow
+            Action:
+              - "ssmmessages:CreateControlChannel"
+              - "ssmmessages:CreateDataChannel"
+              - "ssmmessages:OpenControlChannel"
+              - "ssmmessages:OpenDataChannel"
+            Resource: "*"
+      Roles:
+        - ECSTaskRole
+
+  IAMManagedPolicyGithubActions:
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties:
+      ManagedPolicyName: "GithubActionPolicy"
+      Path: "/"
+      PolicyDocument: !Sub |
+        {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Sid": "GetAuthorizationToken",
+                    "Effect": "Allow",
+                    "Action": [
+                        "ecr:GetAuthorizationToken"
+                    ],
+                    "Resource": "*"
+                },
+                {
+                    "Sid": "AllowPull",
+                    "Effect": "Allow",
+                    "Action": [
+                        "ecr:GetDownloadUrlForLayer",
+                        "ecr:BatchGetImage",
+                        "ecr:BatchCheckLayerAvailability"
+                    ],
+                    "Resource": "arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:*"
+                },
+                {
+                    "Sid": "AllowPush",
+                    "Effect": "Allow",
+                    "Action": [
+                        "ecr:GetDownloadUrlForLayer",
+                        "ecr:BatchGetImage",
+                        "ecr:BatchCheckLayerAvailability",
+                        "ecr:PutImage",
+                        "ecr:InitiateLayerUpload",
+                        "ecr:UploadLayerPart",
+                        "ecr:CompleteLayerUpload"
+                    ],
+                    "Resource": "arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:*"
+                },
+                {
+                    "Sid": "RegisterTaskDefinition",
+                    "Effect": "Allow",
+                    "Action": [
+                        "ecs:RegisterTaskDefinition",
+                        "ecs:ListTaskDefinitions",
+                        "ecs:DescribeTaskDefinition"
+                    ],
+                    "Resource": "*"
+                },
+                {
+                    "Sid": "PassRolesInTaskDefinition",
+                    "Effect": "Allow",
+                    "Action": [
+                        "iam:PassRole"
+                    ],
+                    "Resource": [
+                        "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole",
+                        "arn:aws:iam::${AWS::AccountId}:role/ECSTaskRole"
+                    ]
+                },
+                {
+                    "Sid": "DeployService",
+                    "Effect": "Allow",
+                    "Action": [
+                        "ecs:UpdateService",
+                        "ecs:DescribeServices"
+                    ],
+                    "Resource": [
+                        "arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:service/*"
+                    ]
+                }
+            ]
+        }
+Outputs:
+  ECSTaskRole:
+    Value: !Ref ECSTaskRole
+    Export:
+      Name: "ECSTaskRole"
+  ECSTaskExecRole:
+    Value: !Ref ECSTaskExecRole
+    Export:
+      Name: "ECSTaskExecRole"
+  IAMManagedPolicyGithubActions:
+    Value: !Ref IAMManagedPolicyGithubActions
+    Export:
+      Name: "IAMManagedPolicyGithubActions"

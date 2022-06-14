@@ -1,0 +1,151 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "IAM Layer"
+Parameters:
+  ProjectId:
+    Description: "Project name id"
+    Type: String
+    AllowedPattern: '^[a-zA-Z0-9-/:-@\[-\`\{-\~]+$'
+    ConstraintDescription: "InvalidValue[ProjectId]"
+    Default: sample
+  EnvironmentType:
+    Description: "The environment type"
+    Type: String
+    Default: dev
+    AllowedValues:
+      - prd
+      - stage
+      - dev
+    ConstraintDescription: must be a prd or stage or dev
+Resources:
+  # ------------------------------------------------------------#
+  #  IAM
+  # ------------------------------------------------------------#
+  IAMUser:
+    Type: "AWS::IAM::User"
+    Properties:
+      Path: "/"
+      UserName: !Sub "${ProjectId}-${EnvironmentType}"
+      ManagedPolicyArns:
+        - !Ref IAMManagedPolicy
+        - !ImportValue IAMManagedPolicyGithubActions
+  # ------------------------------------------------------------#
+  #  Policy
+  # ------------------------------------------------------------#
+  # cloudformationのアクションのところ（84行目）からLambdaをデプロイする時必要なポリシーです。
+  IAMManagedPolicy:
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties:
+      ManagedPolicyName: !Sub "${ProjectId}-${EnvironmentType}-AppPolicy"
+      Path: "/"
+      PolicyDocument: !Sub |
+        {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": "s3:ListAllMyBuckets",
+                    "Resource": "*"
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "s3:ListBucket",
+                        "s3:GetBucketLocation"
+                    ],
+                    "Resource": [
+                        "arn:aws:s3:::${ProjectId}-${EnvironmentType}-image-bucket/*",
+                    ]
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "s3:PutObject",
+                        "s3:PutObjectAcl",
+                        "s3:GetObject",
+                        "s3:GetObjectAcl",
+                        "s3:DeleteObject"
+                    ],
+                    "Resource": [
+                        "arn:aws:s3:::${ProjectId}-${EnvironmentType}-image-bucket/*",
+                    ]
+                },
+                {
+                    "Sid": "VisualEditor2",
+                    "Effect": "Allow",
+                    "Action": "cognito-idp:*",
+                    "Resource": "arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/*"
+                },
+                {
+                    "Effect":"Allow",
+                    "Action": [
+                        "cloudformation:CreateStack",
+                        "cloudformation:CreateChangeSet",
+                        "cloudformation:ExecuteChangeSet",
+                        "cloudformation:DescribeChangeSet",
+                        "cloudformation:DescribeStacks",
+                        "cloudformation:DescribeStackEvents",
+                        "cloudformation:DescribeStackResources",
+                        "cloudformation:GetTemplate",
+                        "cloudformation:ValidateTemplate",
+                        "cloudformation:GetTemplateSummary"
+                    ],
+                    "Resource": "*"
+                },
+                {
+                    "Effect":"Allow",
+                    "Action": [
+                        "iam:Get*",
+                        "iam:List*",
+                        "iam:PassRole",
+                        "iam:CreateRole",
+                        "iam:DeleteRole",
+                        "iam:AttachRolePolicy",
+                        "iam:DeleteRolePolicy",
+                        "iam:PutRolePolicy",
+                        "iam:TagRole",
+                        "iam:UntagRole"
+                    ],
+                    "Resource": "*"
+                },
+                {
+                    "Effect":"Allow",
+                    "Action": [
+                        "events:Describe*",
+                        "events:Get*",
+                        "events:List*",
+                        "events:CreateEventBus",
+                        "events:DeleteEventBus",
+                        "events:PutRule",
+                        "events:DeleteRule",
+                        "events:PutTargets",
+                        "events:RemoveTargets",
+                        "events:TagResource",
+                        "events:UntagResource"
+                    ],
+                    "Resource": "*"
+                },
+                {
+                    "Effect":"Allow",
+                    "Action": [
+                        "cognito-idp:*"
+                    ],
+                    "Resource": "*"
+                },
+                {
+                    "Effect":"Allow",
+                    "Action": [
+                        "s3:ListBucketMultipartUploads",
+                        "s3:AbortMultipartUpload",
+                        "s3:ListMultipartUploadParts",
+                        "s3:PutObject",
+                        "s3:GetObject",
+                        "s3:DeleteObject",
+                        "s3:ListBucket"
+                    ],
+                    "Resource": [
+                        "arn:aws:s3:::aws-sam-cli-managed-default-samclisourcebucket-faen7vcnclg9/*",
+                        "arn:aws:s3:::aws-sam-cli-managed-default-samclisourcebucket-faen7vcnclg9"
+                    ]
+                }
+            ]
+        }
